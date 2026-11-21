@@ -1,0 +1,77 @@
+name: Release
+
+# Builds the plugin on every push to master and publishes a GitHub release tagged with the
+# version from DiscordPlugin.csproj (e.g. <Version>1.5.0</Version> -> v1.5). If that release
+# already exists the run builds but skips publishing, so bump the version to cut a new release.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [xml]$proj = Get-Content DiscordPlugin/DiscordPlugin.csproj
+          $raw = ($proj.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ } | Select-Object -First 1)
+          if (-not $raw) { throw "No <Version> found in DiscordPlugin.csproj" }
+          $v = [version]$raw
+          $tag = "v$($v.Major).$($v.Minor)"
+
+          # Version.json is what installed copies check for updates; keep it in step with the build.
+          $json = Get-Content Version.json -Raw | ConvertFrom-Json
+          if ($json.Major -ne $v.Major -or $json.Minor -ne $v.Minor) {
+            throw "Version.json ($($json.Major).$($json.Minor)) doesn't match DiscordPlugin.csproj ($tag). Update one to match."
+          }
+
+          gh release view $tag *> $null
+          $exists = $LASTEXITCODE -eq 0
+          $global:LASTEXITCODE = 0  # "not found" is expected; don't let it fail the step
+          if ($exists) { Write-Host "Release $tag already exists; will build but not publish." }
+
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "title=Version $($v.Major).$($v.Minor)" >> $env:GITHUB_OUTPUT
+          "exists=$($exists.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+      - name: Build
+        run: dotnet build DiscordPlugin.sln -c Release
+
+      - name: Package
+        id: package
+        shell: pwsh
+        run: |
+          # Same asset name as earlier releases, in case the launcher looks for it by name.
+          $zip = "DiscordPlugin.zip"
+          Compress-Archive -Path DiscordPlugin/bin/Release/net472/DiscordPlugin.Plugin.dll -DestinationPath $zip
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+
+      - name: Publish release
+        if: steps.version.outputs.exists == 'false'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${{ steps.version.outputs.tag }}" "${{ steps.package.outputs.zip }}"
+          --title "${{ steps.version.outputs.title }}"
+          --target "${{ github.sha }}"
+          --generate-notes

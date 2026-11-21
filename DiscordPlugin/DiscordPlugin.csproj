@@ -8,18 +8,20 @@
     <RootNamespace>DiscordPlugin</RootNamespace>
     <!-- Keep the old DLL name so launcher upgrades replace it rather than install alongside it. -->
     <AssemblyName>DiscordPlugin.Plugin</AssemblyName>
+    <!-- Release version. Major.Minor becomes the GitHub release tag (e.g. v1.5) and must match Version.json. -->
     <Version>1.5.0</Version>
     <Product>DiscordPlugin</Product>
     <Description>Discord Rich Presence for vatSys.</Description>
     <GenerateResourceUsePreserializedResources>false</GenerateResourceUsePreserializedResources>
-    <!-- vatSys's own dependencies want Newtonsoft 13 but it ships 12 with a binding redirect; harmless for us. -->
-    <NoWarn>$(NoWarn);MSB3277</NoWarn>
-    <!-- Path to the vatSys install; override with /p:VatSysDir=... if yours differs. -->
-    <VatSysDir Condition="'$(VatSysDir)' == ''">C:\Program Files (x86)\vatSys\bin</VatSysDir>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <!--
+      vatSys ships Newtonsoft.Json 12 and loads it for us; compile against the same version, don't copy it.
+      NU1903 (advisory for 12.x) is suppressed because this package is compile-only: the runtime copy is vatSys's.
+    -->
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.2" ExcludeAssets="runtime" PrivateAssets="all" NoWarn="NU1903" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,16 +29,26 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Windows.Forms" />
-    <!-- Provided by vatSys at runtime; never copied to the output. -->
+  </ItemGroup>
+
+  <!--
+    vatSys itself is provided by the host at runtime. By default we compile against the stub in
+    ref/vatSys so the build works anywhere (including CI). Pass -p:VatSysExe=<path to vatSys.exe>
+    to compile against a real install instead, e.g. to check the stub still matches.
+  -->
+  <ItemGroup Condition="'$(VatSysExe)' == ''">
+    <ProjectReference Include="..\ref\vatSys\vatSys.csproj" Private="false" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(VatSysExe)' != ''">
     <Reference Include="vatSys">
-      <HintPath>$(VatSysDir)\vatSys.exe</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>$(VatSysDir)\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(VatSysExe)</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
+  <PropertyGroup Condition="'$(VatSysExe)' != ''">
+    <!-- vatSys's own dependencies want Newtonsoft 13 but it ships 12 with a binding redirect; harmless. -->
+    <NoWarn>$(NoWarn);MSB3277</NoWarn>
+  </PropertyGroup>
 
   <ItemGroup>
     <Compile Update="DiscordWindow.cs" SubType="Form" />

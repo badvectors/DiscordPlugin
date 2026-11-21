@@ -24,8 +24,18 @@ Your choice is saved to `Discord.json` in the plugin folder.
 
 #### Building
 
-Requires the .NET SDK and vatSys installed. The project references `vatSys.exe` and `Newtonsoft.Json.dll` from `C:\Program Files (x86)\vatSys\bin`; pass `-p:VatSysDir=<path>` if yours is elsewhere.
+Requires the .NET SDK. vatSys doesn't need to be installed: the plugin compiles against a small stub of the vatSys API in [`ref/vatSys`](ref/vatSys/vatSys.cs), and binds to the real vatSys at runtime.
 
 ```
 dotnet build -c Release
 ```
+
+If you use a new vatSys API, add it to the stub with exactly the same shape as the real one. To check the stub still matches, build against a real install:
+
+```
+dotnet build -c Release -p:VatSysExe="C:\Program Files (x86)\vatSys\bin\vatSys.exe"
+```
+
+#### Releasing
+
+Every push to `master` runs the [Release workflow](.github/workflows/release.yml). It builds the plugin and publishes a GitHub release tagged `v<Major>.<Minor>` from `<Version>` in `DiscordPlugin/DiscordPlugin.csproj`, with the DLL in `DiscordPlugin.zip`. If that release already exists, nothing is published. To cut a release, bump `<Version>` and `Version.json` together; the workflow fails if they don't match.
