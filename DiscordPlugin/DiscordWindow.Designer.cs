@@ -1,4 +1,4 @@
-﻿namespace DiscordPlugin.Plugin
+﻿namespace DiscordPlugin
 {
     partial class DiscordWindow
     {
@@ -28,7 +28,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.backgroundWorker1 = new System.ComponentModel.BackgroundWorker();
             this.comboBoxDisplay = new System.Windows.Forms.ComboBox();
             this.labelDisplay = new System.Windows.Forms.Label();
             this.SuspendLayout();
@@ -90,7 +89,6 @@
         }
 
         #endregion
-        private System.ComponentModel.BackgroundWorker backgroundWorker1;
         private System.Windows.Forms.ComboBox comboBoxDisplay;
         private System.Windows.Forms.Label labelDisplay;
     }
